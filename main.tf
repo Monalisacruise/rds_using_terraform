@@ -1,97 +1,72 @@
 provider "aws" {
   region = "ap-south-1"
 }
- 
-# Get existing VPC
-data "aws_vpc" "existing_vpc" {
-  id = "vpc-062a64eb167bf466e"
-}
- 
-# Subnet in ap-south-1a
-resource "aws_subnet" "subnet_a" {
-  vpc_id            = data.aws_vpc.existing_vpc.id
-  cidr_block        = "10.0.3.0/24"
-  availability_zone = "ap-south-1a"
- 
-  tags = {
-    Name = "Example-Subnet-A"
-  }
-}
- 
-# Subnet in ap-south-1b
-resource "aws_subnet" "subnet_b" {
-  vpc_id            = data.aws_vpc.existing_vpc.id
-  cidr_block        = "10.0.2.0/24"
-  availability_zone = "ap-south-1b"
- 
-  tags = {
-    Name = "Example-Subnet-B"
-  }
-}
- 
-# Internet Gateway
-resource "aws_internet_gateway" "gw" {
-  vpc_id = data.aws_vpc.existing_vpc.id
- 
-  tags = {
-    Name = "datasource-Terraform-internet-gateway"
-  }
-}
- 
-# Security Group for RDS
+
+# 1. Create Security Group for MySQL
 resource "aws_security_group" "rds_sg" {
-  name        = "rds-security-group"
-  description = "Allow RDS access"
-  vpc_id      = data.aws_vpc.existing_vpc.id
- 
+  name        = "Mona-rds-sg"
+  description = "Security group for RDS MySQL"
+  vpc_id      = ""vpc-062a64eb167bf466e
+
   ingress {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Replace with your IP range for security
+    cidr_blocks = ["0.0.0.0/0"] # Consider restricting this for security
   }
- 
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
- 
+
   tags = {
-    Name = "rds-sg"
+    Name = "MonaRDS-SG"
   }
 }
- 
-# Subnet Group for RDS (must span 2 AZs)
-resource "aws_db_subnet_group" "rds_subnet_group" {
-  name       = "rds-subnet-group"
-  subnet_ids = [
-    aws_subnet.subnet_a.id,
-    aws_subnet.subnet_b.id
+
+# 2. Create DB Subnet Group
+resource "aws_db_subnet_group" "mona_db_subnet_group" {
+  name        = "Mona-db-subnet-group"
+  description = "Subnet group for RDS MySQL"
+  subnet_ids  = [
+    "subnet-020fe5b35678a7f43",
+    "subnet-00c8ecff39630e95e"
   ]
- 
+
   tags = {
-    Name = "RDS Subnet Group"
+    Name = "MonaDBSubnetGroup"
   }
 }
- 
-# RDS Instance (private)
-resource "aws_db_instance" "example_rds" {
-  identifier              = "example-rds"
+
+# 3. Create RDS Instance
+resource "aws_db_instance" "Mona_rds" {
+  identifier              = "Mona-mysql-db"
   allocated_storage       = 20
   engine                  = "mysql"
   engine_version          = "8.0"
   instance_class          = "db.t3.micro"
-  db_name                 = "exampledb"
+  db_name                 = "Mona_DB"
   username                = "admin"
-  password                = "YourSecurePassword123!" # Use Spacelift context or variable in production
-  db_subnet_group_name    = aws_db_subnet_group.rds_subnet_group.name
-  vpc_security_group_ids  = [aws_security_group.rds_sg.id]
+  password                = "Monalisa"
+  parameter_group_name    = "default.mysql8.0"
   skip_final_snapshot     = true
-  publicly_accessible     = false  #  RDS is now private
- 
+
+  db_subnet_group_name    = aws_db_subnet_group.shagun_db_subnet_group.name
+  vpc_security_group_ids  = [aws_security_group.rds_sg.id]
+
+  publicly_accessible     = true
+  multi_az                = false
+  backup_retention_period = 7
+  storage_type            = "gp2"
+
   tags = {
-    Name = "Example-RDS"
+    Name        = "MonaRDS"
+    Environment = "Dev"
   }
 }
+
+
+ 
